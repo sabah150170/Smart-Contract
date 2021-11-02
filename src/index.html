@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Lottery</title>
+    <script language="javascript" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="./web3.min.js"></script>
+
+    <script>
+      window.addEventListener('load', async function() {
+        //check whether Web3 has been injected by the browser (Mist/MetaMask)
+        if (window.ethereum) {
+          window.web3js = new Web3(window.ethereum) //select Mist or MetaMask as provider, do not use "web3.currentProvider" due to version problem, no loner support window.web3
+          await window.ethereum.enable()
+          console.log("1")
+        }
+        else {
+          alert("Non-Ethereum browser detected. You should consider trying MetaMask!"); //pop up a message to install Metamask to use our app
+        }
+
+        function readTextFile(file, mime, callback) { //get content of abi 
+          var rawFile = new XMLHttpRequest();
+          rawFile.overrideMimeType(mime);
+          rawFile.open("GET", file, true)
+          rawFile.onreadystatechange = function() {
+            if (rawFile.readyState === 4 && rawFile.status == "200") {
+              callback(rawFile.responseText);
+            }
+          }
+          rawFile.send(null)
+        }
+
+        readTextFile("./Lottery.json", "application/json", async function(text){
+
+          readTextFile("./contractAddress.txt", "application/text", async function(text2){
+            var scAddress = text2.trim() //to eliminate /n
+
+            var scABI = JSON.parse(text)
+            var smartContract = new web3js.eth.Contract(scABI, scAddress) //start app and access web3js
+
+            const account = await ethereum.request({ method: 'eth_accounts' })
+
+            //FUNCTIONS 
+            async function callPersonNumber(){
+              return await smartContract.methods.returnNumbers().call({from: account[0]})
+            }
+            
+            async function getPrice(){
+              return await smartContract.methods.price().call()
+            }
+
+            async function getAward(){
+              return await smartContract.methods.award().call()
+            }
+
+            async function getBalance(){
+               return await smartContract.methods.getBalance().call()
+            }
+
+            async function getPlayerCount(){  
+              return await smartContract.methods.personCount().call()
+            }
+
+            async function getLimit(){
+               return await smartContract.methods.personLimit().call()
+            }
+
+            async function handleWithButtons() { //make buttons visible when needed and vice versa 
+              if (await getPlayerCount() >= await getLimit()) {                                              
+                document.getElementsByTagName("button")[0].style.visibility = "hidden"; //make first button unvisile
+                if(account[0].toUpperCase() == (await smartContract.methods.owner().call()).toUpperCase() ){ //web3.eth.accounts[0]
+                  document.getElementById("custom").style.visibility = "hidden";
+                  document.getElementsByTagName("button")[1].style.visibility = "visible"; //make second button visible  
+                }
+              }
+              else {
+                document.getElementsByTagName("button")[0].style.visibility = "visible"; //make first button unvisile
+              }
+            }
+
+            async function handleCurrentVariables() { //update current balance and palyer count, Refactoring
+              document.getElementById("balance").textContent = "current balance:\t" + await getBalance()
+              document.getElementById("count").textContent = "current player:\t" + await getPlayerCount()
+            }
+
+            async function listMyNumber(){                                                                    
+              let l = await callPersonNumber()
+              if (l.length != 0){
+                var text = "Your numbers: ";
+                for (let i = 0; i < l.length; i++) { text += l[i] + " "; }
+                document.getElementById("myNumbers").textContent = text
+              }
+            }
+
+            
+            //EVENT 
+            smartContract.events.Updating().on("data", function(event){ //if new player joins, update displayed information 
+              handleWithButtons();                                                                                     
+              let e = event.returnValues                                                                                     
+              document.getElementById("balance").textContent = "current balance:\t" + e.balance
+              document.getElementById("count").textContent = "current player:\t" + e.personCount
+            });
+
+            smartContract.events.NoWinner().on("data", function(event){   //no lucky number
+              console.log("NoWinner")
+              let e = event.returnValues
+              let value = e.value
+              let luckyNumber = e.luckyNumber
+              if(value == 1){
+                document.getElementById("winner").textContent = "Time is expired so all money will be given back !!!"
+              }
+              else if(value == 2){
+                document.getElementById("winner").textContent = "No winner !!!"
+                document.getElementById("number").textContent = "Lucky Number:\t" + e.luckyNumber
+              }
+              handleCurrentVariables()
+            });
+
+            smartContract.events.Winner().on("data", function(event){  //lucky number is generated 
+              console.log("Winner")                                                                    
+              let e = event.returnValues  
+              document.getElementById("winner").textContent = "Winner:\t" + e.winner
+              document.getElementById("number").textContent = "Lucky Number:\t" + e.luckyNumber
+              handleCurrentVariables()
+            });
+
+
+            //DESIGN HTML
+            document.getElementById("award").textContent = "Award:\t" + await getAward()
+            document.getElementById("price").textContent = "Price:\t" + await getPrice()
+            handleCurrentVariables()
+
+            listMyNumber()
+            handleWithButtons()
+
+            //EVENT LISTENERS
+            document.getElementById("b0").addEventListener("click", takeNumberAndShowUp)
+            async function takeNumberAndShowUp(){ 
+              let x = document.getElementById('custom').value
+              await smartContract.methods.createPersonNumber(x).send({ from: account[0], value: await getPrice() }) 
+              listMyNumber()                
+              handleWithButtons()
+              await handleCurrentVariables()        
+            }
+
+            document.getElementById("b1").addEventListener("click", getWinner);  
+            async function getWinner(){
+              document.getElementsByTagName("button")[1].style.visibility = "hidden";
+              await smartContract.methods.getWinner().send({from: account[0]}) 
+              console.log("ok")
+            }
+          }); //readTextFile
+        }); //readTextFile
+      }); //add event listener
+
+    </script>
+  </head>
+
+  <body>
+
+    <h1> Lottery Game </h1>
+
+    <h2 id="winner"> </h2>
+    <h2 id="number"> </h2>
+
+    </br></br>
+
+    <h2 id="price"></h2>
+    <h2 id="award"></h2>
+
+    <br/>
+
+    <input type="number" id="custom" style="visibility:visible;"><br>
+    <button type="button" id="b0" style="visibility:hidden;"> Join to Game </button>  <!-- it visible only count is less than limit  -->
+
+    <button type="button" id="b1" style="visibility:hidden;"> Get the Winner </button>  <!-- only owner can see -->
+
+    <h3 id="balance"></h3>
+    <h3 id="count"></h3>
+
+    <h1 id="myNumbers">  </h1>
+
+
+    <script>
+    </script>
+
+  </body>
+</html>
+

@@ -1,0 +1,10 @@
+{
+
+	"url2" : "https://ropsten.infura.io/v3/xxx",
+	"url" : "Web3.providers.HttpProvider('http://localhost:7545')",
+	"contractName" : "Lottery",
+	"PrivateKey" : "xxx",
+	"account" : "0xE3a0AEeDeF7dBE1E2782E295d92cfdFB8F2FB8eB",
+	"network" : "localhost"
+
+}

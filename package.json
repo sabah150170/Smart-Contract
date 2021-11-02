@@ -1,0 +1,22 @@
+{
+  "name": "lottery",
+  "version": "1.0.0",
+  "main": "deneme.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://bag.org.tr/proje/busenur.sabah/lottery.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "ethereumjs-tx": "^2.1.2",
+    "fs-extra": "^10.0.0",
+    "solc": "^0.8.7-fixed",
+    "web3": "^1.5.2"
+  }
+}
